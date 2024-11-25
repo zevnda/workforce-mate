@@ -1,2 +1,1 @@
-- Added support for LinkedIn
-- Miscellaneous styling changes
+- Fixed an issue that required the JSE page to be refreshed after adding a job in order to have the input added to the page again

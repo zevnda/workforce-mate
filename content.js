@@ -13,22 +13,25 @@ function initializeExtension() {
 
 // Add new div to form - retry if form not found
 function addDivToForm() {
+    console.log('check');
     const form = document.querySelector('.container-fluid');
     if (!form) {
         setTimeout(() => addDivToForm(), retryInterval);
         return;
     }
 
-    if (document.getElementById(buttonId)) return;
+    if (!document.getElementById(buttonId)) {
+        const newDiv = createFormFillerElements();
+        form.insertBefore(newDiv.mainDiv, form.firstChild);
 
-    const newDiv = createFormFillerElements();
-    form.insertBefore(newDiv.mainDiv, form.firstChild);
+        // Close the annoying calender UI that is always open by default
+        const calenderDiv = document.getElementById('ui-datepicker-div');
+        calenderDiv.style.display = 'none';
 
-    // Close the annoying calender UI that is always open by default
-    const calenderDiv = document.getElementById('ui-datepicker-div');
-    calenderDiv.style.display = 'none';
+        setTimeout(() => newDiv.input.focus(), 0);
+    }
 
-    setTimeout(() => newDiv.input.focus(), 0);
+    setTimeout(() => addDivToForm(), retryInterval);
 }
 
 // Main div element
@@ -170,8 +173,7 @@ function fillFormFromSeek(htmlData) {
 
     const jobTitle = doc.querySelector('h1[data-automation="job-detail-title"]')?.textContent;
     const jobLocation = doc.querySelector('span[data-automation="job-detail-location"]')?.textContent;
-    const jobAgent = doc.querySelector('h1[data-automation="job-detail-title"]')?.closest('div')
-        ?.nextElementSibling?.querySelector('span')?.textContent.trim();
+    const jobAgent = doc.querySelector('span[data-automation="advertiser-name"]')?.textContent;
 
     setInputValue('input[name="JobTitle"]', jobTitle, 50);
     setInputValue('input[name="JobLocation"]', jobLocation);
