@@ -34,6 +34,7 @@ function buildManifest(browser) {
         );
     });
     copyDirectory(path.join(__dirname, 'icons'), path.join(dirPath, 'icons'));
+    console.log(`Successfully built ${browser} dist to ${dirPath}`);
 }
 
 buildManifest('chrome');

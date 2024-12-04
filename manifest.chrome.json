@@ -12,11 +12,12 @@
     "content_scripts": [
         {
             "matches": [
-                "https://www.workforceaustralia.gov.au/*",
-                "https://www.seek.com.au/*",
-                "https://au.jora.com/*",
-                "https://au.indeed.com/*",
-                "https://*.linkedin.com/*"
+                "https://*.workforceaustralia.gov.au/*",
+                "https://*.seek.com.au/*",
+                "https://*.jora.com/*",
+                "https://*.indeed.com/*",
+                "https://*.linkedin.com/*",
+                "https://*.careerone.com.au/*"
             ],
             "js": [
                 "content.js"

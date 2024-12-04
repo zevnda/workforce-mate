@@ -13,7 +13,6 @@ function initializeExtension() {
 
 // Add new div to form - retry if form not found
 function addDivToForm() {
-    console.log('check');
     const form = document.querySelector('.container-fluid');
     if (!form) {
         setTimeout(() => addDivToForm(), retryInterval);
@@ -123,7 +122,7 @@ function createButton() {
     return button;
 }
 
-// Handle button clikc
+// Handle button click
 async function handleButtonClick(e) {
     e.preventDefault();
     const input = document.querySelector(`#${buttonId} input`);
@@ -141,6 +140,7 @@ async function handleButtonClick(e) {
         if (url.includes('au.jora.com/')) fillFormFromJora(jobData);
         if (url.includes('au.indeed.com/')) fillFormFromIndeed(jobData);
         if (url.includes('linkedin.com/')) fillFormFromLinkedin(jobData);
+        if (url.includes('careerone.com.au/')) fillFormFromCareerOne(jobData);
     } catch (error) {
         console.error('Error:', error.message);
     }
@@ -219,6 +219,21 @@ function fillFormFromLinkedin(htmlData) {
     const jobTitle = doc.querySelector('h3.sub-nav-cta__header')?.textContent;
     const jobLocation = doc.querySelector('span.sub-nav-cta__meta-text')?.textContent;
     const jobAgent = doc.querySelector('a.topcard__org-name-link')?.textContent;
+
+    setInputValue('input[name="JobTitle"]', jobTitle, 50);
+    setInputValue('input[name="JobLocation"]', jobLocation);
+    setInputValue('input[name="AgentName"]', jobAgent);
+    setInputValue('input[name="EmployerContact"]', 'Online');
+    setSelectValue('select[name="ApplicationMethod"]', 'ONEX');
+}
+
+function fillFormFromCareerOne(htmlData) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlData, 'text/html');
+
+    const jobTitle = doc.querySelector('h1.jv-title')?.textContent;
+    const jobLocation = doc.querySelector('a.text-dark-500[title]')?.textContent;
+    const jobAgent = doc.querySelector('a.text-title-3.text-black')?.textContent;
 
     setInputValue('input[name="JobTitle"]', jobTitle, 50);
     setInputValue('input[name="JobLocation"]', jobLocation);
