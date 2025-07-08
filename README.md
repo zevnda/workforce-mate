@@ -1,13 +1,15 @@
 <div align="center">
   <img src="https://i.imgur.com/QHYnlVw.png" width='80' alt='Click for larger image' />
   <h1>Workforce Mate</h1>
-  <p>Automatically pulls job information from job listing sites and fills out the form on Workforce Australia for you</p>
+  <p>Automatically pulls job information from job listing sites and fills out the form on Workforce Australia for you.</p>
 </div>
 <div align="center" style="margin-top: 10px;">
   <img src="https://i.imgur.com/lPoaaG5.png" width='700' alt='Click for larger image' />
 </div>
 
 ## Installation
+> [!IMPORTANT]
+> Workforce Mate currently only supports [DES participants](https://www.servicesaustralia.gov.au/disability-employment-services)
 - **Chrome:** Install directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/haeckfjephijlgkadecdknebckfndnpi)
 - **Firefox:** Install directly from the [Mozilla Add-ons website](https://addons.mozilla.org/en-US/firefox/addon/workforce-mate/)
 
@@ -24,7 +26,7 @@
 
 ## How to use
 1. Find a job listing on one of the supported sites and copy the URL
-2. Paste the URL in to the input box and click 'Fill Form'
+2. Paste the URL into the input box and click 'Fill Form'
 3. Sip your beer and let the magic happen
 
 **Video demonstration**
