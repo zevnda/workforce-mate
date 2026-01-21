@@ -31,7 +31,7 @@
 
 **Video demonstration**
 
-[![Video Title](https://i.imgur.com/1SQ8hWp.png)](https://www.youtube.com/watch?v=C0yKAg6IklU)
+[![Video Title](https://i.imgur.com/1SQ8hWp.png)](https://youtu.be/do4CUiK0t3Q)
 
 ## Support
 Just got your $500 advance payment? Consider supporting me
