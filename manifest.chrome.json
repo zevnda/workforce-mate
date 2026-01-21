@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Workforce Mate",
-    "version": "1.2.4",
+    "version": "2.0.0",
     "description": "Fill out your job search efforts on the Workforce Australia website with ease",
     "host_permissions": [
         "https://www.workforceaustralia.gov.au/*"
