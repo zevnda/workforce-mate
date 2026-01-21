@@ -36,4 +36,4 @@
 ## Support
 Just got your $500 advance payment? Consider supporting me
 
-[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-ff69b4?logo=github&style=for-the-badge)](https://github.com/sponsors/probablyraging)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-GitHub-ff69b4?logo=github&style=for-the-badge)](https://github.com/sponsors/zevnda)
