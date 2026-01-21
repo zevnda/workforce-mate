@@ -1,3 +1,1 @@
 - Update to work with the new Workforce Australia UI
-- Added support for CareerOne job listings
-- Improved match patterns for some URL permissions
