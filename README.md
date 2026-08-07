@@ -9,7 +9,7 @@
 
 ## Installation
 > [!IMPORTANT]
-> Workforce Mate currently only supports [DES participants](https://www.servicesaustralia.gov.au/disability-employment-services)
+> Because every job seeker's situation involves different variables, Workforce Mate may not be fully compatible for everyone. You'll need to test it yourself to confirm it works for your specific case.
 - **Chrome:** Install directly from the [Chrome Web Store](https://chromewebstore.google.com/detail/haeckfjephijlgkadecdknebckfndnpi)
 - **Firefox:** Install directly from the [Mozilla Add-ons website](https://addons.mozilla.org/en-US/firefox/addon/workforce-mate/)
 
