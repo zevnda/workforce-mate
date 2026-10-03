@@ -14,6 +14,7 @@
             "matches": [
                 "https://*.workforceaustralia.gov.au/*",
                 "https://*.seek.com.au/*",
+                "https://*.seek.com/*",
                 "https://*.jora.com/*",
                 "https://*.indeed.com/*",
                 "https://*.linkedin.com/*",

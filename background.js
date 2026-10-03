@@ -11,7 +11,7 @@ if (browserAPI.webRequest) {
             });
             return { responseHeaders: headers };
         },
-        { urls: ["*://*.seek.com.au/*", "*://*.jora.com/*", "*://*.indeed.com/*"] },
+        { urls: ["*://*.seek.com/*", "*://*.seek.com.au/*", "*://*.jora.com/*", "*://*.indeed.com/*"] },
         ["blocking", "responseHeaders"]
     )
 };

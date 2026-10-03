@@ -9,6 +9,13 @@ const month = String(today.getMonth() + 1).padStart(2, '0');
 const year = today.getFullYear();
 const formattedDate = `${day}/${month}/${year}`;
 
+// Form field selectors - IEA participants use form.<field>, regular WFA uses form.submissionData.<field>
+const fieldSelectors = {
+    applicationSentDate: 'input[name="form.applicationSentDate"], input[name="form.submissionData.applicationSentDate"]',
+    jobTitle: 'input[name="form.jobTitle"], input[name="form.submissionData.jobTitle"]',
+    employerName: 'input[name="form.employerName"], input[name="form.submissionData.employerName"]',
+};
+
 // Initialize the extension
 function initializeExtension() {
     if (document.readyState === 'loading') {
@@ -141,7 +148,7 @@ async function handleButtonClick(e) {
     try {
         const jobData = await fetchJobData(url);
 
-        if (url.includes('seek.com.au/')) fillFormFromSeek(jobData);
+        if (url.includes('seek.com.au/') || url.includes('seek.com/')) fillFormFromSeek(jobData);
         if (url.includes('au.jora.com/')) fillFormFromJora(jobData);
         if (url.includes('au.indeed.com/')) fillFormFromIndeed(jobData);
         if (url.includes('linkedin.com/')) fillFormFromLinkedin(jobData);
@@ -179,10 +186,11 @@ function fillFormFromSeek(htmlData) {
     const jobTitle = doc.querySelector('h1[data-automation="job-detail-title"]')?.textContent;
     const jobAgent = doc.querySelector('span[data-automation="advertiser-name"]')?.textContent;
 
-    setInputValue('input[name="form.applicationSentDate"]', formattedDate);
-    setInputValue('input[name="form.jobTitle"]', jobTitle, 50);
-    setInputValue('input[name="form.employerName"]', jobAgent);
+    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
+    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
+    setInputValue(fieldSelectors.employerName, jobAgent);
     setApplicationMethodValue('Online');
+    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
 }
 
 function fillFormFromJora(htmlData) {
@@ -192,10 +200,11 @@ function fillFormFromJora(htmlData) {
     const jobTitle = doc.querySelector('h1.job-title')?.textContent;
     const jobAgent = doc.querySelector('span.company')?.textContent;
 
-    setInputValue('input[name="form.applicationSentDate"]', formattedDate);
-    setInputValue('input[name="form.jobTitle"]', jobTitle, 50);
-    setInputValue('input[name="form.employerName"]', jobAgent);
+    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
+    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
+    setInputValue(fieldSelectors.employerName, jobAgent);
     setApplicationMethodValue('Online');
+    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
 }
 
 function fillFormFromIndeed(htmlData) {
@@ -205,10 +214,11 @@ function fillFormFromIndeed(htmlData) {
     const jobTitle = doc.querySelector('h1.jobsearch-JobInfoHeader-title')?.textContent;
     const jobAgent = doc.querySelector('div[data-testid="inlineHeader-companyName"] a')?.textContent.trim().split('.css')[0];
 
-    setInputValue('input[name="form.applicationSentDate"]', formattedDate);
-    setInputValue('input[name="form.jobTitle"]', jobTitle, 50);
-    setInputValue('input[name="form.employerName"]', jobAgent);
+    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
+    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
+    setInputValue(fieldSelectors.employerName, jobAgent);
     setApplicationMethodValue('Online');
+    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
 }
 
 function fillFormFromLinkedin(htmlData) {
@@ -218,10 +228,11 @@ function fillFormFromLinkedin(htmlData) {
     const jobTitle = doc.querySelector('h3.sub-nav-cta__header')?.textContent;
     const jobAgent = doc.querySelector('a.topcard__org-name-link')?.textContent;
 
-    setInputValue('input[name="form.applicationSentDate"]', formattedDate);
-    setInputValue('input[name="form.jobTitle"]', jobTitle, 50);
-    setInputValue('input[name="form.employerName"]', jobAgent);
+    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
+    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
+    setInputValue(fieldSelectors.employerName, jobAgent);
     setApplicationMethodValue('Online');
+    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
 }
 
 function fillFormFromCareerOne(htmlData) {
@@ -231,10 +242,11 @@ function fillFormFromCareerOne(htmlData) {
     const jobTitle = doc.querySelector('h1.jv-title')?.textContent;
     const jobAgent = doc.querySelector('a.text-title-3.text-black')?.textContent;
 
-    setInputValue('input[name="form.applicationSentDate"]', formattedDate);
-    setInputValue('input[name="form.jobTitle"]', jobTitle, 50);
-    setInputValue('input[name="form.employerName"]', jobAgent);
+    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
+    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
+    setInputValue(fieldSelectors.employerName, jobAgent);
     setApplicationMethodValue('Online');
+    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
 }
 
 // Set input value
@@ -252,6 +264,15 @@ function setInputValue(selector, value, maxLength) {
         input.dispatchEvent(new Event('blur', { bubbles: true }));
     } else {
         console.error(`${selector} not found or value is empty`);
+    }
+}
+
+// Check a checkbox if it exists - optional field, not present on every form
+function setCheckboxChecked(selector) {
+    const checkbox = document.querySelector(selector);
+    if (checkbox && !checkbox.checked) {
+        // Click rather than set .checked so the framework registers the change
+        checkbox.click();
     }
 }
 

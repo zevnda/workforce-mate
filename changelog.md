@@ -1,1 +1,2 @@
-- Update to work with the new Workforce Australia UI
+- Add support for the new Seek URL format `au.seek.com`, previously `seek.com.au`
+- Add support for regular WFA participants via the Job application (manual) method
