@@ -11,7 +11,7 @@ Workforce Mate is a browser extension for Australian job seekers. On the WFA "ad
 
 It ships for **Chrome** (Manifest V3) and **Firefox** (Manifest V2) from one codebase. Published on the Chrome Web Store and Firefox Add-ons (links in README.md).
 
-**Supported job sites:** SEEK (`seek.com.au` and the newer `au.seek.com`), Jora, LinkedIn.
+**Supported job sites:** SEEK (`seek.com.au` and the newer `au.seek.com`), Jora, LinkedIn, Adzuna, and WFA's own job listings (`/individuals/jobs/details/<id>`).
 **Removed:** Indeed and CareerOne. Both serve a Cloudflare / bot-check page (HTTP 401/403, "Just a moment...", "Authenticating...") to the extension's background fetch. Don't re-add them, or any site, by working around bot protection. That means evading the site's protections, and it's fragile anyway.
 
 ## Files
@@ -20,7 +20,7 @@ It ships for **Chrome** (Manifest V3) and **Firefox** (Manifest V2) from one cod
 |---|---|
 | `sites.js` | **The job site definitions and all extraction logic.** Shared by `background.js` and `content.js` in the extension, and by `scripts/check-sites.js` in Node. |
 | `content.js` | Runs on WFA pages only. Injects the UI, sends the URL to the background script, extracts details with `sites.js`, fills the form, shows status messages. |
-| `background.js` | Fetches job pages on request (MV3 service worker in Chrome, MV2 background page in Firefox). Only fetches URLs that `getJobSite()` accepts. |
+| `background.js` | Fetches job pages on request (MV3 service worker in Chrome, MV2 background page in Firefox). Only fetches URLs that `getJobSite()` and `getFetchUrl()` accept. |
 | `manifest.chrome.json` / `manifest.firefox.json` | Per-browser manifests. `build.js` copies the right one to `dist/<browser>/manifest.json`. There is no root `manifest.json`. |
 | `build.js` | Copies `background.js`, `content.js`, `sites.js`, `icons/` and the manifest into `dist/chrome` and `dist/firefox`. No bundling or transpiling. |
 | `scripts/check-sites.js` | Node diagnostic that runs the real extraction against live URLs (see Testing). Uses `jsdom` (the only dependency, a devDependency). |
@@ -36,11 +36,11 @@ WFA page (content.js + sites.js)                 background (background.js + sit
 ──────────────────────────────────               ───────────────────────────────────────
 user pastes URL, clicks Fill Form / Enter
 getJobSite(url) → unsupported? show error, stop
-runtime.sendMessage({action:'fetchJobData', url}) ──►  getJobSite(url) again (refuse others)
-                                                        fetch(url, {credentials:'omit', 15s timeout})
+runtime.sendMessage({action:'fetchJobData', url}) ──►  getJobSite + getFetchUrl again (refuse others)
+                                                        fetch(fetchUrl, {credentials:'omit', 15s timeout})
                      ◄── {data, finalUrl} | {error, status}
-DOMParser → Document
-looksLikeBotChallenge(doc)? → error
+parseJobPage: JSON.parse (format 'json') or
+  DOMParser → Document + looksLikeBotChallenge check
 extractJobDetails(site, doc) → {values, sources, attempts}
 logExtraction(...)  (console, with table on failure)
 fillForm(values) → list of user-facing problems
@@ -52,7 +52,7 @@ Content scripts are subject to the page's CORS rules, so they can't read cross-s
 - **Chrome:** `host_permissions` in `manifest.chrome.json`
 - **Firefox:** the URL patterns in `permissions` in `manifest.firefox.json`
 
-The job sites must be in those lists or the fetch fails (Firefox reports a `NetworkError`).
+The job sites must be in those lists or the fetch fails (Firefox reports a `NetworkError`). That includes `*.workforceaustralia.gov.au`, because the background script fetches the WFA vacancy API. Don't remove it.
 
 ### Shared globals, not modules
 `sites.js` declares top-level `const`/`function`s (`JOB_SITES`, `JOB_FIELDS`, `getJobSite`, `extractJobDetails`, `looksLikeBotChallenge`, ...). Classic scripts share one global scope, so other files use them directly:
@@ -70,7 +70,11 @@ Both scripts use `const browserAPI = (typeof browser !== 'undefined' ? browser :
 
 ## Extraction (`sites.js`)
 
-Each entry in `JOB_SITES` has a `name`, `domains` and an ordered list of `strategies`. Each strategy has a `name` and an `extract(doc)` that returns `{ jobTitle?, employerName? }`. `extractJobDetails` runs **every** strategy:
+Each entry in `JOB_SITES` has a `name`, `domains` and an ordered list of `strategies`, plus two optional settings:
+- **`toFetchUrl(url)`** maps the listing URL (a `URL` object) to the URL actually fetched. It returns `null` when the URL isn't a listing, and `getFetchUrl(site, url)` applies it.
+- **`format: 'json'`** makes the content script `JSON.parse` the response, so strategies receive the object instead of a `Document`. It also sends `Accept: application/json` and skips the bot-check test.
+
+ Each strategy has a `name` and an `extract(doc)` that returns `{ jobTitle?, employerName? }`. `extractJobDetails` runs **every** strategy:
 - each field comes from the **first** strategy that finds it;
 - a strategy that throws is recorded in `attempts`; it doesn't abort the others;
 - values are whitespace-normalized by `cleanText`.
@@ -84,6 +88,8 @@ Current strategies, most to least preferred:
 | All sites | `fromJsonLd`: schema.org `JobPosting` JSON-LD. **No supported site embeds it today**; it's first so that it takes over automatically if a site adds it. |
 | SEEK | `[data-automation="job-detail-title"]` / `[data-automation="advertiser-name"]` (SEEK's test hooks, the most stable markup) → `fromSeekApolloData` (parses the `window.SEEK_APOLLO_DATA = {...}` inline script; finds the `__typename: 'Job'` object; the advertiser name key carries args, e.g. `name({"locale":"en-AU"})`; resolves Apollo `__ref` pointers) → page `<title>` `"<title> Job in <location> - SEEK"` (title only). |
 | Jora | `h1.job-title` / `.company` → `<title>` `"<title> job at <employer> in <location> \| Jora"`. Note the `<h1>` is the advertiser's own wording (e.g. "Looking for Residential Cleaners \| Paddington..."), while `<title>` uses a normalized job title. Both are acceptable; markup wins. |
+| Adzuna | JSON-LD (present and complete) → `h1` / `.ui-company` → `<title>` `"<title> - adzuna.com.au"` (title only). Only `/details/<id>` pages work; `/land/ad/` links redirect to the advertiser's own site. Adzuna blocks some HTTP clients (curl gets 429; Node `fetch` gets 200), so if it starts failing in browsers, check that first. |
+| Workforce Australia | Listing pages are rendered client-side, so the HTML has no job data. `toFetchUrl` turns `/individuals/jobs/details/<id>` into the public, unauthenticated `/api/v1/global/vacancies/<id>` (the API WFA's own page calls, found in `FindAJob.min.module.js`), and the strategy reads `title` and `employerName`. An unknown or removed ID returns **HTTP 204**, which `background.js` reports as status 404 ("expired"). |
 | LinkedIn | `h1.top-card-layout__title, .topcard__title, h3.sub-nav-cta__header` / `.topcard__org-name-link` → `<title>`, which LinkedIn serves in **two formats** that alternate between requests: `"<employer> hiring <title> in <location> \| LinkedIn"` and `"<title> at <employer> — <location> \| LinkedIn Jobs"` (em dash). |
 
 Guidelines for changing strategies:
@@ -138,7 +144,7 @@ Other form details:
 ## Fetching rules (`background.js`)
 
 - **`credentials: 'omit'` is required.** Sending the user's cookies made LinkedIn return its logged-in app page, which has none of the expected markup. The extension must behave the same whether or not the user is logged in to a job site. Users do **not** need to be logged in to any job site, only to WFA.
-- **Only supported URLs:** `getJobSite(url)` is re-checked before fetching, so a compromised or malicious page can't use the extension to fetch arbitrary URLs.
+- **Only supported URLs:** `getJobSite(url)` and `getFetchUrl` are re-checked before fetching, so a compromised or malicious page can't use the extension to fetch arbitrary URLs.
 - **Timeout and status:** a 15s `AbortController` timeout, and a non-2xx response is an error carrying `status`. Never parse an error page as if it were a job listing; that was the original cause of "fields empty" bugs.
 - **No CORS header injection.** An earlier version used `webRequest`/`webRequestBlocking` to add `Access-Control-Allow-Origin: *` to every SEEK and Jora response, including during the user's normal browsing. That was removed: host permissions already let the background fetch read the response, and the injection weakened those sites' security in the user's browser. Don't reintroduce it. If a Firefox fetch ever fails with CORS, check the host permissions first.
 

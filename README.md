@@ -22,7 +22,7 @@
 
 ## Features
 - ✅ Chrome and Firefox versions available
-- ✅ Support for Seek, Jora, and LinkedIn job listings
+- ✅ Support for [Seek](https://au.seek.com), [Jora](https://au.jora.com), [LinkedIn](https://www.linkedin.com/jobs), [Adzuna](https://www.adzuna.com.au), and [Workforce Australia](https://www.workforceaustralia.gov.au/individuals/jobs/search) job listings
 
 ## How to use
 1. Find a job listing on one of the supported sites and copy the URL

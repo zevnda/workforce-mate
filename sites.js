@@ -5,6 +5,12 @@
 // can still supply the value. Strategies run against a parsed Document, which lets this file
 // be shared by the extension (background.js, content.js) and scripts/check-sites.js in Node.
 //
+// Optional site settings:
+// - toFetchUrl(url): maps the listing URL (a URL object) to the URL to fetch, e.g. a JSON API.
+//   Return null if the URL isn't a job listing.
+// - format: 'json' to parse the response as JSON, so strategies receive the parsed object
+//   instead of a Document. Defaults to 'html'.
+//
 // When adding a site, also add its domain to the host permissions in both manifests.
 
 const JOB_SITES = [
@@ -78,6 +84,42 @@ const JOB_SITES = [
             },
         ],
     },
+    {
+        name: 'Adzuna',
+        domains: ['adzuna.com.au'],
+        strategies: [
+            { name: 'JSON-LD JobPosting', extract: fromJsonLd },
+            {
+                name: 'Adzuna page markup',
+                extract: doc => ({
+                    jobTitle: textOf(doc, 'h1'),
+                    employerName: textOf(doc, '.ui-company'),
+                }),
+            },
+            {
+                // e.g. "Cleaners - adzuna.com.au"
+                name: 'Page title',
+                extract: doc => ({ jobTitle: matchGroup(doc.title, /^(.+) - adzuna\.com\.au$/, 1) }),
+            },
+        ],
+    },
+    {
+        // WFA's own listings are rendered client-side, so read the public API their page uses
+        name: 'Workforce Australia',
+        domains: ['workforceaustralia.gov.au'],
+        format: 'json',
+        // e.g. /individuals/jobs/details/2353719157 -> /api/v1/global/vacancies/2353719157
+        toFetchUrl: url => {
+            const vacancyId = url.pathname.match(/\/jobs\/details\/(\d+)/)?.[1];
+            return vacancyId ? `${url.origin}/api/v1/global/vacancies/${vacancyId}` : null;
+        },
+        strategies: [
+            {
+                name: 'WFA vacancy API',
+                extract: vacancy => ({ jobTitle: vacancy.title, employerName: vacancy.employerName }),
+            },
+        ],
+    },
 ];
 
 const JOB_FIELDS = ['jobTitle', 'employerName'];
@@ -97,10 +139,15 @@ function getJobSite(url) {
     ) || null;
 }
 
-// Run a site's strategies against a parsed page.
+// The URL to fetch for a job listing URL, or null if the site doesn't recognise it as a listing
+function getFetchUrl(site, url) {
+    return site.toFetchUrl ? site.toFetchUrl(new URL(url)) : url;
+}
+
+// Run a site's strategies against a parsed page (a Document, or an object for JSON sites).
 // Returns { values, sources, attempts } - sources says which strategy supplied each field,
 // attempts records what every strategy found (or threw) for debugging.
-function extractJobDetails(site, doc) {
+function extractJobDetails(site, page) {
     const values = {};
     const sources = {};
     const attempts = [];
@@ -108,7 +155,7 @@ function extractJobDetails(site, doc) {
     for (const strategy of site.strategies) {
         let found = {};
         try {
-            found = strategy.extract(doc) || {};
+            found = strategy.extract(page) || {};
         } catch (error) {
             attempts.push({ strategy: strategy.name, error: error.message });
             continue;
@@ -214,5 +261,5 @@ function cleanText(value) {
 
 // Allow scripts/check-sites.js to use this file in Node
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { JOB_SITES, JOB_FIELDS, getJobSite, extractJobDetails, looksLikeBotChallenge };
+    module.exports = { JOB_SITES, JOB_FIELDS, getJobSite, getFetchUrl, extractJobDetails, looksLikeBotChallenge };
 }

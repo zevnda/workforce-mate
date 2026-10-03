@@ -5,3 +5,4 @@
 - Read job details in several ways per site, so a change to one part of a job site's page no longer breaks filling
 - Show clear status and error messages below the URL box, for example when a site blocks the request or a listing has expired
 - The extension now only runs on Workforce Australia pages
+- Add support for Adzuna and Workforce Australia job listings

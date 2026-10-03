@@ -5,7 +5,7 @@
 // Usage: npm run check-sites -- <job listing URL> [<job listing URL> ...]
 
 const { JSDOM } = require('jsdom');
-const { JOB_FIELDS, getJobSite, extractJobDetails, looksLikeBotChallenge } = require('../sites.js');
+const { JOB_FIELDS, getJobSite, getFetchUrl, extractJobDetails, looksLikeBotChallenge } = require('../sites.js');
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0';
 
@@ -13,15 +13,18 @@ async function checkUrl(url) {
     console.log(`\n${url}`);
 
     const site = getJobSite(url);
-    if (!site) {
-        console.log('  FAIL  Not a supported job site URL');
+    const fetchUrl = site && getFetchUrl(site, url);
+    if (!fetchUrl) {
+        console.log('  FAIL  Not a supported job listing URL');
         return false;
     }
+    if (fetchUrl !== url) console.log(`  Fetching ${fetchUrl}`);
 
+    const isJson = site.format === 'json';
     let response;
     try {
-        response = await fetch(url, {
-            headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
+        response = await fetch(fetchUrl, {
+            headers: { 'User-Agent': USER_AGENT, Accept: isJson ? 'application/json' : 'text/html,application/xhtml+xml' },
             signal: AbortSignal.timeout(15000),
         });
     } catch (error) {
@@ -29,15 +32,25 @@ async function checkUrl(url) {
         return false;
     }
 
-    const doc = new JSDOM(await response.text()).window.document;
-    console.log(`  ${site.name} | HTTP ${response.status} | page title: "${doc.title}"`);
-
-    if (!response.ok || looksLikeBotChallenge(doc)) {
-        console.log('  FAIL  Blocked or error page. Note results from here can differ from a browser.');
-        return false;
+    const body = await response.text();
+    let page;
+    if (isJson) {
+        console.log(`  ${site.name} | HTTP ${response.status}`);
+        if (!response.ok || response.status === 204) {
+            console.log('  FAIL  Error or empty response (HTTP 204 means the listing does not exist)');
+            return false;
+        }
+        page = JSON.parse(body);
+    } else {
+        page = new JSDOM(body).window.document;
+        console.log(`  ${site.name} | HTTP ${response.status} | page title: "${page.title}"`);
+        if (!response.ok || looksLikeBotChallenge(page)) {
+            console.log('  FAIL  Blocked or error page. Note results from here can differ from a browser.');
+            return false;
+        }
     }
 
-    const { values, sources, attempts } = extractJobDetails(site, doc);
+    const { values, sources, attempts } = extractJobDetails(site, page);
     console.table(attempts);
 
     let ok = true;

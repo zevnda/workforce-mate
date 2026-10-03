@@ -201,7 +201,7 @@ async function handleButtonClick(e) {
     }
 
     const site = getJobSite(url);
-    if (!site) {
+    if (!site || !getFetchUrl(site, url)) {
         log.warn('Unsupported or invalid URL:', url);
         showStatus(`That isn't a job listing URL from a supported site (${formatList(JOB_SITES.map(s => s.name))}).`, 'error');
         return;
@@ -211,18 +211,10 @@ async function handleButtonClick(e) {
     showStatus(`Fetching job details from ${site.name}...`);
 
     try {
-        const html = await fetchJobPage(url, site);
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-
-        if (looksLikeBotChallenge(doc)) {
-            throw new FillError(
-                `${site.name} showed a bot check instead of the job listing. Please fill in the job details manually.`,
-                `Bot challenge page received from ${url} (page title: "${doc.title}")`
-            );
-        }
-
-        const job = extractJobDetails(site, doc);
-        logExtraction(site, url, doc, job);
+        const body = await fetchJobPage(url, site);
+        const page = parseJobPage(site, url, body);
+        const job = extractJobDetails(site, page);
+        logExtraction(site, url, page, job);
 
         const problems = fillForm(job.values);
         if (problems.length) {
@@ -257,6 +249,26 @@ async function fetchJobPage(url, site) {
     return response.data;
 }
 
+// Parse the fetched body into what the site's strategies expect: a Document, or an object for JSON sites
+function parseJobPage(site, url, body) {
+    if (site.format === 'json') {
+        try {
+            return JSON.parse(body);
+        } catch (error) {
+            throw new FillError(`${site.name} returned an unexpected response. Try again in a moment.`, `Invalid JSON from ${url}: ${error.message}`);
+        }
+    }
+
+    const doc = new DOMParser().parseFromString(body, 'text/html');
+    if (looksLikeBotChallenge(doc)) {
+        throw new FillError(
+            `${site.name} showed a bot check instead of the job listing. Please fill in the job details manually.`,
+            `Bot challenge page received from ${url} (page title: "${doc.title}")`
+        );
+    }
+    return doc;
+}
+
 function describeFetchError(site, status) {
     if (status === 'timeout') return `${site.name} took too long to respond. Try again in a moment.`;
     if (status === 404 || status === 410) return `${site.name} couldn't find that job listing. It may have expired or been removed.`;
@@ -268,12 +280,12 @@ function describeFetchError(site, status) {
 }
 
 // Log what was extracted and how, so a broken site is easy to diagnose from the console
-function logExtraction(site, url, doc, job) {
+function logExtraction(site, url, page, job) {
     const missing = JOB_FIELDS.filter(field => !job.values[field]);
     const summary = `${site.name}: ${missing.length ? `could not find ${missing.join(', ')}` : 'found all job details'}`;
     const logFn = missing.length ? log.warn : log.info;
 
-    logFn(summary, { url, pageTitle: doc.title, values: job.values, sources: job.sources });
+    logFn(summary, { url, pageTitle: page.title, values: job.values, sources: job.sources });
     if (missing.length) {
         // Every strategy's result shows which part of the site's page has changed
         console.table(job.attempts);

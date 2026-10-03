@@ -8,7 +8,8 @@
         "https://*.seek.com.au/*",
         "https://*.seek.com/*",
         "https://*.jora.com/*",
-        "https://*.linkedin.com/*"
+        "https://*.linkedin.com/*",
+        "https://*.adzuna.com.au/*"
     ],
     "background": {
         "service_worker": "background.js"

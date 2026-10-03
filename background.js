@@ -20,10 +20,12 @@ browserAPI.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep the message channel open for the async response
 });
 
-async function fetchJobPage(url) {
+async function fetchJobPage(listingUrl) {
     // Only fetch from supported job sites, never arbitrary URLs passed in from a page
-    if (!getJobSite(url)) {
-        throw new Error(`Refusing to fetch unsupported URL: ${url}`);
+    const site = getJobSite(listingUrl);
+    const url = site && getFetchUrl(site, listingUrl);
+    if (!url) {
+        throw new Error(`Refusing to fetch unsupported URL: ${listingUrl}`);
     }
 
     const controller = new AbortController();
@@ -34,10 +36,14 @@ async function fetchJobPage(url) {
         const response = await fetch(url, {
             credentials: 'omit',
             signal: controller.signal,
-            headers: { Accept: 'text/html,application/xhtml+xml' },
+            headers: { Accept: site.format === 'json' ? 'application/json' : 'text/html,application/xhtml+xml' },
         });
         if (!response.ok) {
             throw Object.assign(new Error(`HTTP ${response.status} fetching ${url}`), { status: response.status });
+        }
+        // The WFA vacancy API answers an unknown or removed listing with 204 No Content
+        if (response.status === 204) {
+            throw Object.assign(new Error(`No content (HTTP 204) fetching ${url}`), { status: 404 });
         }
         return { data: await response.text(), finalUrl: response.url };
     } catch (error) {
