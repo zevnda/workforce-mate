@@ -1,20 +1,40 @@
+// Relies on sites.js, which the manifest loads before this file
 const browserAPI = (typeof browser !== 'undefined' ? browser : chrome);
 const buttonId = 'workforce-mate';
 const retryInterval = 500;
 
-// Get today's date in DD/MM/YYYY format
-const today = new Date();
-const day = String(today.getDate()).padStart(2, '0');
-const month = String(today.getMonth() + 1).padStart(2, '0');
-const year = today.getFullYear();
-const formattedDate = `${day}/${month}/${year}`;
+const log = {
+    info: (...args) => console.info('[Workforce Mate]', ...args),
+    warn: (...args) => console.warn('[Workforce Mate]', ...args),
+    error: (...args) => console.error('[Workforce Mate]', ...args),
+};
 
 // Form field selectors - IEA participants use form.<field>, regular WFA uses form.submissionData.<field>
 const fieldSelectors = {
     applicationSentDate: 'input[name="form.applicationSentDate"], input[name="form.submissionData.applicationSentDate"]',
     jobTitle: 'input[name="form.jobTitle"], input[name="form.submissionData.jobTitle"]',
     employerName: 'input[name="form.employerName"], input[name="form.submissionData.employerName"]',
+    isAdvertised: 'input[name="form.submissionData.isAdvertised"]',
 };
+
+const fieldLabels = { jobTitle: 'job title', employerName: 'employer name' };
+const jobTitleMaxLength = 50;
+
+// An error with a message that is safe and useful to show the user
+class FillError extends Error {
+    constructor(userMessage, details) {
+        super(details || userMessage);
+        this.userMessage = userMessage;
+    }
+}
+
+// Get today's date in DD/MM/YYYY format
+function getFormattedDate() {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    return `${day}/${month}/${today.getFullYear()}`;
+}
 
 // Initialize the extension
 function initializeExtension() {
@@ -54,22 +74,24 @@ function createFormFillerElements() {
     flexDiv.style.cssText = 'display: flex; gap: 6px; ';
 
     const label = createLabel();
-    
+
     const description = document.createElement('p');
-    description.textContent = 'Paste the URL of a job listing from Seek, Jora, or LinkedIn.';
+    description.textContent = `Paste the URL of a job listing from ${formatList(JOB_SITES.map(site => site.name))}.`;
     description.style.cssText = `
         font-size: 16px;
         color: #4F4F4F;
     `;
-    
+
     const { inputDiv, input } = createInput();
     const button = createButton();
+    const status = createStatus();
 
     mainDiv.appendChild(label);
     mainDiv.appendChild(description);
     mainDiv.append(flexDiv);
     flexDiv.appendChild(inputDiv);
     flexDiv.appendChild(button);
+    mainDiv.appendChild(status);
 
     // Add divider below the main div
     const divider = document.createElement('div');
@@ -104,6 +126,11 @@ function createInput() {
         width: 100%;
     `;
 
+    // Submit with Enter, without submitting the WFA form itself
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') handleButtonClick(e);
+    });
+
     inputDiv.appendChild(input);
 
     return { inputDiv, input };
@@ -112,6 +139,7 @@ function createInput() {
 // Button element
 function createButton() {
     const button = document.createElement('button');
+    button.type = 'button';
     button.textContent = 'Fill Form';
     button.style.cssText = `
         background-color: #0076BD;
@@ -134,6 +162,33 @@ function createButton() {
     return button;
 }
 
+// Status message element, shown below the input
+function createStatus() {
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.style.cssText = 'font-size: 14px; margin-top: 6px; display: none;';
+    return status;
+}
+
+const statusColors = { info: '#4F4F4F', success: '#1E7D32', warning: '#9A5B00', error: '#B3261E' };
+
+function showStatus(message, type = 'info') {
+    const status = document.querySelector(`#${buttonId} [role="status"]`);
+    if (!status) return;
+    status.textContent = message;
+    status.style.color = statusColors[type];
+    status.style.display = message ? 'block' : 'none';
+}
+
+function setBusy(busy) {
+    const button = document.querySelector(`#${buttonId} button`);
+    if (!button) return;
+    button.disabled = busy;
+    button.textContent = busy ? 'Filling...' : 'Fill Form';
+    button.style.opacity = busy ? '0.7' : '1';
+    button.style.cursor = busy ? 'wait' : 'pointer';
+}
+
 // Handle button click
 async function handleButtonClick(e) {
     e.preventDefault();
@@ -141,100 +196,143 @@ async function handleButtonClick(e) {
     const url = input.value.trim();
 
     if (!url) {
-        console.error('Please enter a valid URL');
+        showStatus('Paste a job listing URL first.', 'error');
         return;
     }
 
-    try {
-        const jobData = await fetchJobData(url);
+    const site = getJobSite(url);
+    if (!site) {
+        log.warn('Unsupported or invalid URL:', url);
+        showStatus(`That isn't a job listing URL from a supported site (${formatList(JOB_SITES.map(s => s.name))}).`, 'error');
+        return;
+    }
 
-        if (url.includes('seek.com.au/') || url.includes('seek.com/')) fillFormFromSeek(jobData);
-        if (url.includes('au.jora.com/')) fillFormFromJora(jobData);
-        if (url.includes('linkedin.com/')) fillFormFromLinkedin(jobData);
+    setBusy(true);
+    showStatus(`Fetching job details from ${site.name}...`);
+
+    try {
+        const html = await fetchJobPage(url, site);
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        if (looksLikeBotChallenge(doc)) {
+            throw new FillError(
+                `${site.name} showed a bot check instead of the job listing. Please fill in the job details manually.`,
+                `Bot challenge page received from ${url} (page title: "${doc.title}")`
+            );
+        }
+
+        const job = extractJobDetails(site, doc);
+        logExtraction(site, url, doc, job);
+
+        const problems = fillForm(job.values);
+        if (problems.length) {
+            showStatus(`Form partly filled. ${problems.join(' ')}`, 'warning');
+        } else {
+            showStatus(`Filled from ${site.name}: ${job.values.jobTitle} at ${job.values.employerName}. Check the details before submitting.`, 'success');
+        }
     } catch (error) {
-        console.error('Error:', error.message);
+        log.error(error.message, error);
+        showStatus(error.userMessage || 'Something went wrong filling the form. See the browser console for details.', 'error');
+    } finally {
+        setBusy(false);
     }
 }
 
-// Fetch job data
-function fetchJobData(url) {
-    return new Promise((resolve, reject) => {
-        browserAPI.runtime.sendMessage({ action: "fetchJobData", url }, response => {
-            if (browserAPI.runtime.lastError) {
-                console.error('Runtime error:', browserAPI.runtime.lastError);
-                reject(new Error(browserAPI.runtime.lastError.message));
-            } else if (response && response.error) {
-                console.error('Response error:', response.error);
-                reject(new Error(response.error));
-            } else if (response && response.data) {
-                resolve(response.data);
-            } else {
-                console.error('Invalid response:', response);
-                reject(new Error("Invalid response"));
-            }
-        });
-    });
+// Fetch the job page HTML via the background script, which can make cross-site requests
+async function fetchJobPage(url, site) {
+    let response;
+    try {
+        response = await browserAPI.runtime.sendMessage({ action: 'fetchJobData', url });
+    } catch (error) {
+        // Happens after the extension is updated or reloaded while this page is open
+        throw new FillError('Workforce Mate was updated or reloaded. Refresh this page and try again.', `sendMessage failed: ${error.message}`);
+    }
+
+    if (!response) {
+        throw new FillError('Workforce Mate had an internal error. Refresh this page and try again.', 'Empty response from background script');
+    }
+    if (response.error) {
+        throw new FillError(describeFetchError(site, response.status), response.error);
+    }
+    return response.data;
 }
 
-// Fill form with job data
-function fillFormFromSeek(htmlData) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlData, 'text/html');
-
-    const jobTitle = doc.querySelector('h1[data-automation="job-detail-title"]')?.textContent;
-    const jobAgent = doc.querySelector('span[data-automation="advertiser-name"]')?.textContent;
-
-    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
-    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
-    setInputValue(fieldSelectors.employerName, jobAgent);
-    setApplicationMethodValue('Online');
-    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
+function describeFetchError(site, status) {
+    if (status === 'timeout') return `${site.name} took too long to respond. Try again in a moment.`;
+    if (status === 404 || status === 410) return `${site.name} couldn't find that job listing. It may have expired or been removed.`;
+    if ([401, 403, 429, 503, 999].includes(status)) {
+        return `${site.name} blocked the request (HTTP ${status}), probably with bot protection. Please fill in the job details manually.`;
+    }
+    if (typeof status === 'number') return `${site.name} returned an error (HTTP ${status}). Try again in a moment.`;
+    return `Couldn't load the job listing from ${site.name}. Check your internet connection and try again.`;
 }
 
-function fillFormFromJora(htmlData) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlData, 'text/html');
+// Log what was extracted and how, so a broken site is easy to diagnose from the console
+function logExtraction(site, url, doc, job) {
+    const missing = JOB_FIELDS.filter(field => !job.values[field]);
+    const summary = `${site.name}: ${missing.length ? `could not find ${missing.join(', ')}` : 'found all job details'}`;
+    const logFn = missing.length ? log.warn : log.info;
 
-    const jobTitle = doc.querySelector('h1.job-title')?.textContent;
-    const jobAgent = doc.querySelector('span.company')?.textContent;
-
-    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
-    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
-    setInputValue(fieldSelectors.employerName, jobAgent);
-    setApplicationMethodValue('Online');
-    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
+    logFn(summary, { url, pageTitle: doc.title, values: job.values, sources: job.sources });
+    if (missing.length) {
+        // Every strategy's result shows which part of the site's page has changed
+        console.table(job.attempts);
+    }
 }
 
-function fillFormFromLinkedin(htmlData) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlData, 'text/html');
+// Fill the WFA form. Returns a list of user-facing problems, empty if everything was filled.
+function fillForm(values) {
+    const problems = [];
 
-    const jobTitle = doc.querySelector('h3.sub-nav-cta__header')?.textContent;
-    const jobAgent = doc.querySelector('a.topcard__org-name-link')?.textContent;
+    // Form fields missing means the WFA form itself has changed
+    const missingInputs = ['applicationSentDate', 'jobTitle', 'employerName']
+        .filter(field => !document.querySelector(fieldSelectors[field]));
+    if (missingInputs.length) {
+        log.error('WFA form fields not found:', missingInputs.map(field => fieldSelectors[field]));
+        throw new FillError(
+            "Couldn't find the job search form fields on this page. Workforce Australia may have changed the form.",
+            `Form fields not found: ${missingInputs.join(', ')}`
+        );
+    }
 
-    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
-    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
-    setInputValue(fieldSelectors.employerName, jobAgent);
-    setApplicationMethodValue('Online');
-    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
+    setInputValue(fieldSelectors.applicationSentDate, getFormattedDate());
+
+    const unfilled = JOB_FIELDS.filter(field => !values[field]);
+    for (const field of JOB_FIELDS) {
+        if (values[field]) setInputValue(fieldSelectors[field], values[field], field === 'jobTitle' ? jobTitleMaxLength : undefined);
+    }
+    if (unfilled.length) {
+        problems.push(`Couldn't read the ${formatList(unfilled.map(field => fieldLabels[field]), 'and')} from the listing, so please fill ${unfilled.length > 1 ? 'them' : 'it'} in.`);
+    }
+
+    if (!setApplicationMethodValue('Online')) {
+        problems.push('Please select the application method.');
+    }
+    setCheckboxChecked(fieldSelectors.isAdvertised);
+
+    return problems;
 }
 
 // Set input value
 function setInputValue(selector, value, maxLength) {
     const input = document.querySelector(selector);
-    if (input && value) {
-        const newValue = maxLength ? value.slice(0, maxLength).trim() : value.trim();
-        
-        // Set the value
-        input.value = newValue;
-        
-        // Trigger events to notify the framework
-        input.dispatchEvent(new Event('input', { bubbles: true }));
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        input.dispatchEvent(new Event('blur', { bubbles: true }));
-    } else {
-        console.error(`${selector} not found or value is empty`);
+    if (!input || !value) {
+        log.error(`${selector} not found or value is empty`);
+        return false;
     }
+
+    // Respect the form's own maxlength as well as ours
+    const limits = [maxLength, input.maxLength > 0 ? input.maxLength : undefined].filter(Boolean);
+    const newValue = limits.length ? value.slice(0, Math.min(...limits)).trim() : value.trim();
+
+    // Set the value
+    input.value = newValue;
+
+    // Trigger events to notify the framework
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    input.dispatchEvent(new Event('blur', { bubbles: true }));
+    return true;
 }
 
 // Check a checkbox if it exists - optional field, not present on every form
@@ -246,21 +344,27 @@ function setCheckboxChecked(selector) {
     }
 }
 
-// Set select value
+// Set select value. Returns whether the option was found.
 function setApplicationMethodValue(value) {
     // Find the dropdown item with the matching text
-    const dropdownItems = document.querySelectorAll('.mint-combobox-dropdown .dropdown-item');
-    
-    for (const item of dropdownItems) {
-        const itemText = item.querySelector('.dropdown-item-inner')?.textContent.trim();
-        if (itemText === value) {
-            // Click the item to trigger the selection
-            item.click();
-            return;
-        }
+    const dropdownItems = [...document.querySelectorAll('.mint-combobox-dropdown .dropdown-item')];
+    const optionText = item => item.querySelector('.dropdown-item-inner')?.textContent.trim();
+
+    const match = dropdownItems.find(item => optionText(item) === value);
+    if (match) {
+        // Click the item to trigger the selection
+        match.click();
+        return true;
     }
-    
-    console.error(`Dropdown option "${value}" not found`);
+
+    log.error(`Application method option "${value}" not found. Options on the page:`, dropdownItems.map(optionText));
+    return false;
+}
+
+// "a", "a or b", "a, b, or c"
+function formatList(items, conjunction = 'or') {
+    if (items.length <= 2) return items.join(` ${conjunction} `);
+    return `${items.slice(0, -1).join(', ')}, ${conjunction} ${items[items.length - 1]}`;
 }
 
 initializeExtension();

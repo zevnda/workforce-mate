@@ -26,6 +26,7 @@ function buildManifest(browser) {
     const filesToCopy = [
         'background.js',
         'content.js',
+        'sites.js',
     ];
     filesToCopy.forEach(file => {
         fs.copyFileSync(

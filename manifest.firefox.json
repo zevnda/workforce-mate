@@ -8,25 +8,21 @@
         "https://*.seek.com.au/*",
         "https://*.seek.com/*",
         "https://*.jora.com/*",
-        "https://*.linkedin.com/*",
-        "webRequest",
-        "webRequestBlocking"
+        "https://*.linkedin.com/*"
     ],
     "background": {
         "scripts": [
+            "sites.js",
             "background.js"
         ]
     },
     "content_scripts": [
         {
             "matches": [
-                "https://*.workforceaustralia.gov.au/*",
-                "https://*.seek.com.au/*",
-                "https://*.seek.com/*",
-                "https://*.jora.com/*",
-                "https://*.linkedin.com/*"
+                "https://*.workforceaustralia.gov.au/*"
             ],
             "js": [
+                "sites.js",
                 "content.js"
             ]
         }

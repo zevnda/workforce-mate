@@ -1,5 +1,9 @@
 {
     "scripts": {
-        "build": "node build.js"
+        "build": "node build.js",
+        "check-sites": "node scripts/check-sites.js"
+    },
+    "devDependencies": {
+        "jsdom": "^30.1.1"
     }
 }
