@@ -1,2 +1,4 @@
 - Add support for the new Seek URL format `au.seek.com`, previously `seek.com.au`
 - Add support for regular WFA participants via the Job application (manual) method
+- Remove Indeed and CareerOne support, as they now block job page requests with bot detection
+- Fix LinkedIn job details fetch

@@ -56,7 +56,7 @@ function createFormFillerElements() {
     const label = createLabel();
     
     const description = document.createElement('p');
-    description.textContent = 'Paste the URL of a job listing from Seek, Jora, Indeed, CareerOne, or LinkedIn.';
+    description.textContent = 'Paste the URL of a job listing from Seek, Jora, or LinkedIn.';
     description.style.cssText = `
         font-size: 16px;
         color: #4F4F4F;
@@ -150,9 +150,7 @@ async function handleButtonClick(e) {
 
         if (url.includes('seek.com.au/') || url.includes('seek.com/')) fillFormFromSeek(jobData);
         if (url.includes('au.jora.com/')) fillFormFromJora(jobData);
-        if (url.includes('au.indeed.com/')) fillFormFromIndeed(jobData);
         if (url.includes('linkedin.com/')) fillFormFromLinkedin(jobData);
-        if (url.includes('careerone.com.au/')) fillFormFromCareerOne(jobData);
     } catch (error) {
         console.error('Error:', error.message);
     }
@@ -207,40 +205,12 @@ function fillFormFromJora(htmlData) {
     setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
 }
 
-function fillFormFromIndeed(htmlData) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlData, 'text/html');
-
-    const jobTitle = doc.querySelector('h1.jobsearch-JobInfoHeader-title')?.textContent;
-    const jobAgent = doc.querySelector('div[data-testid="inlineHeader-companyName"] a')?.textContent.trim().split('.css')[0];
-
-    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
-    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
-    setInputValue(fieldSelectors.employerName, jobAgent);
-    setApplicationMethodValue('Online');
-    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
-}
-
 function fillFormFromLinkedin(htmlData) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlData, 'text/html');
 
     const jobTitle = doc.querySelector('h3.sub-nav-cta__header')?.textContent;
     const jobAgent = doc.querySelector('a.topcard__org-name-link')?.textContent;
-
-    setInputValue(fieldSelectors.applicationSentDate, formattedDate);
-    setInputValue(fieldSelectors.jobTitle, jobTitle, 50);
-    setInputValue(fieldSelectors.employerName, jobAgent);
-    setApplicationMethodValue('Online');
-    setCheckboxChecked('input[name="form.submissionData.isAdvertised"]');
-}
-
-function fillFormFromCareerOne(htmlData) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(htmlData, 'text/html');
-
-    const jobTitle = doc.querySelector('h1.jv-title')?.textContent;
-    const jobAgent = doc.querySelector('a.text-title-3.text-black')?.textContent;
 
     setInputValue(fieldSelectors.applicationSentDate, formattedDate);
     setInputValue(fieldSelectors.jobTitle, jobTitle, 50);

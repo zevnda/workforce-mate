@@ -8,9 +8,7 @@
         "https://*.seek.com.au/*",
         "https://*.seek.com/*",
         "https://*.jora.com/*",
-        "https://*.indeed.com/*",
         "https://*.linkedin.com/*",
-        "https://*.careerone.com.au/*",
         "webRequest",
         "webRequestBlocking"
     ],
@@ -26,9 +24,7 @@
                 "https://*.seek.com.au/*",
                 "https://*.seek.com/*",
                 "https://*.jora.com/*",
-                "https://*.indeed.com/*",
-                "https://*.linkedin.com/*",
-                "https://*.careerone.com.au/*"
+                "https://*.linkedin.com/*"
             ],
             "js": [
                 "content.js"

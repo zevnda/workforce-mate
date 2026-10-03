@@ -22,7 +22,7 @@
 
 ## Features
 - ✅ Chrome and Firefox versions available
-- ✅ Support for Seek, Jora, Indeed, LinkedIn, and CareerOne job listings
+- ✅ Support for Seek, Jora, and LinkedIn job listings
 
 ## How to use
 1. Find a job listing on one of the supported sites and copy the URL
